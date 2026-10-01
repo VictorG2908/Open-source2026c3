@@ -1,0 +1,223 @@
+﻿using System.Data;
+using InfoLibro.Modelos;
+using InfoLibro.Seguridad;
+using Microsoft.Data.SqlClient;
+
+namespace InfoLibro.Datos;
+
+public class ResultadoLogin
+{
+    public bool Exito { get; set; }
+    public Usuario Usuario { get; set; }
+    public string Mensaje { get; set; }
+    public int IntentosRestantes { get; set; }
+    public bool Bloqueado { get; set; }
+}
+
+/// <summary>
+/// Acceso a la tabla Usuarios (ADO.NET). Todas las consultas usan parámetros (@usuario, @id...)
+/// para evitar inyección SQL: el texto que escribe el usuario nunca se pega dentro del SQL.
+/// </summary>
+public static class UsuarioDatos
+{
+    public const int MaxIntentos = 3;
+    public const int MinutosBloqueo = 5;
+
+    // El conteo de intentos fallidos vive en memoria (se reinicia al cerrar el programa).
+    static readonly Dictionary<string, int> intentos = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    static readonly Dictionary<string, DateTime> bloqueos = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+
+    const string ConsultaBase = @"
+        SELECT u.IdUsuario, u.NombreUsuario, u.NombreCompleto, u.Correo, u.ClaveHash, u.Salt,
+               u.IdRol, u.Activo, u.FechaRegistro,
+               r.NombreRol, r.PuedeConsultar, r.PuedeAgregar, r.PuedeModificar, r.PuedeEliminar, r.PuedeAdministrar
+        FROM Usuarios u
+        INNER JOIN Roles r ON r.IdRol = u.IdRol ";
+
+    static Usuario Leer(SqlDataReader rd)
+    {
+        return new Usuario
+        {
+            IdUsuario = (int)rd["IdUsuario"],
+            NombreUsuario = (string)rd["NombreUsuario"],
+            NombreCompleto = (string)rd["NombreCompleto"],
+            Correo = (string)rd["Correo"],
+            ClaveHash = (string)rd["ClaveHash"],
+            Salt = (string)rd["Salt"],
+            IdRol = (int)rd["IdRol"],
+            Activo = (bool)rd["Activo"],
+            FechaRegistro = (DateTime)rd["FechaRegistro"],
+            Rol = RolDatos.LeerRol(rd)
+        };
+    }
+
+    static Usuario ObtenerPorNombre(string nombreUsuario)
+    {
+        using var cn = Conexion.Crear();
+        cn.Open();
+        using var cmd = new SqlCommand(ConsultaBase + "WHERE u.NombreUsuario = @usuario", cn);
+        cmd.Parameters.Add("@usuario", SqlDbType.NVarChar, 30).Value = nombreUsuario;
+        using var rd = cmd.ExecuteReader();
+        return rd.Read() ? Leer(rd) : null;
+    }
+
+    public static ResultadoLogin ValidarCredenciales(string nombreUsuario, string clave)
+    {
+        nombreUsuario = (nombreUsuario ?? "").Trim();
+
+        // ¿Está bloqueado por demasiados intentos?
+        if (bloqueos.TryGetValue(nombreUsuario, out DateTime hasta))
+        {
+            if (DateTime.Now < hasta)
+            {
+                int minutos = (int)Math.Ceiling((hasta - DateTime.Now).TotalMinutes);
+                return new ResultadoLogin
+                {
+                    Bloqueado = true,
+                    Mensaje = $"Demasiados intentos fallidos. Intenta de nuevo en {minutos} minuto(s)."
+                };
+            }
+            bloqueos.Remove(nombreUsuario);
+            intentos.Remove(nombreUsuario);
+        }
+
+        Usuario u = ObtenerPorNombre(nombreUsuario);
+
+        bool correcto = u != null && u.Activo &&
+            string.Equals(Hash.Calcular(clave, u.Salt), u.ClaveHash, StringComparison.OrdinalIgnoreCase);
+
+        if (correcto)
+        {
+            intentos.Remove(nombreUsuario);
+            return new ResultadoLogin { Exito = true, Usuario = u };
+        }
+
+        // Intento fallido (mismo mensaje exista o no el usuario, por seguridad)
+        intentos.TryGetValue(nombreUsuario, out int n);
+        n++;
+        intentos[nombreUsuario] = n;
+
+        if (n >= MaxIntentos)
+        {
+            bloqueos[nombreUsuario] = DateTime.Now.AddMinutes(MinutosBloqueo);
+            return new ResultadoLogin
+            {
+                Bloqueado = true,
+                Mensaje = $"Has fallado {MaxIntentos} veces. El acceso se bloqueó por {MinutosBloqueo} minutos."
+            };
+        }
+
+        return new ResultadoLogin
+        {
+            Mensaje = "Usuario o contraseña incorrectos.",
+            IntentosRestantes = MaxIntentos - n
+        };
+    }
+
+    public static List<Usuario> ObtenerTodos()
+    {
+        var lista = new List<Usuario>();
+        using var cn = Conexion.Crear();
+        cn.Open();
+        using var cmd = new SqlCommand(ConsultaBase + "ORDER BY u.IdUsuario", cn);
+        using var rd = cmd.ExecuteReader();
+        while (rd.Read()) lista.Add(Leer(rd));
+        return lista;
+    }
+
+    public static bool Crear(Usuario u, string clave, out string error)
+    {
+        Permisos.Exigir(Accion.Administrar, "crear usuarios");
+        error = null;
+
+        string salt = Hash.GenerarSalt();
+        string hash = Hash.Calcular(clave, salt);
+
+        try
+        {
+            using var cn = Conexion.Crear();
+            cn.Open();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO Usuarios (NombreUsuario, NombreCompleto, Correo, ClaveHash, Salt, IdRol)
+                VALUES (@usuario, @nombre, @correo, @hash, @salt, @idRol);
+                SELECT CAST(SCOPE_IDENTITY() AS INT);", cn);
+            cmd.Parameters.Add("@usuario", SqlDbType.NVarChar, 30).Value = u.NombreUsuario;
+            cmd.Parameters.Add("@nombre", SqlDbType.NVarChar, 100).Value = u.NombreCompleto;
+            cmd.Parameters.Add("@correo", SqlDbType.NVarChar, 120).Value = u.Correo;
+            cmd.Parameters.Add("@hash", SqlDbType.Char, 64).Value = hash;
+            cmd.Parameters.Add("@salt", SqlDbType.VarChar, 50).Value = salt;
+            cmd.Parameters.Add("@idRol", SqlDbType.Int).Value = u.IdRol;
+
+            u.IdUsuario = (int)cmd.ExecuteScalar();
+            return true;
+        }
+        catch (SqlException ex) when (ex.Number == 2627 || ex.Number == 2601)   // usuario duplicado
+        {
+            error = "Ya existe un usuario con ese nombre.";
+            return false;
+        }
+        catch (SqlException ex) when (ex.Number == 547)                          // rol inexistente
+        {
+            error = "El rol seleccionado no existe.";
+            return false;
+        }
+    }
+
+    public static bool RestablecerClave(int idUsuario, string nuevaClave)
+    {
+        Permisos.Exigir(Accion.Administrar, "restablecer contraseñas");
+
+        string salt = Hash.GenerarSalt();
+        string hash = Hash.Calcular(nuevaClave, salt);
+
+        using var cn = Conexion.Crear();
+        cn.Open();
+        using var cmd = new SqlCommand(@"
+            UPDATE Usuarios SET ClaveHash = @hash, Salt = @salt
+            OUTPUT inserted.NombreUsuario
+            WHERE IdUsuario = @id", cn);
+        cmd.Parameters.Add("@hash", SqlDbType.Char, 64).Value = hash;
+        cmd.Parameters.Add("@salt", SqlDbType.VarChar, 50).Value = salt;
+        cmd.Parameters.Add("@id", SqlDbType.Int).Value = idUsuario;
+
+        string nombre = cmd.ExecuteScalar() as string;
+        if (nombre == null) return false;
+
+        // También desbloquea al usuario si estaba bloqueado
+        bloqueos.Remove(nombre);
+        intentos.Remove(nombre);
+        return true;
+    }
+
+    public static bool Eliminar(int idUsuario, out string error)
+    {
+        Permisos.Exigir(Accion.Eliminar, "eliminar usuarios");
+        error = null;
+
+        if (Sesion.UsuarioActual != null && Sesion.UsuarioActual.IdUsuario == idUsuario)
+        {
+            error = "No puedes eliminar tu propia cuenta mientras tienes la sesión abierta.";
+            return false;
+        }
+
+        try
+        {
+            using var cn = Conexion.Crear();
+            cn.Open();
+            using var cmd = new SqlCommand("DELETE FROM Usuarios WHERE IdUsuario = @id", cn);
+            cmd.Parameters.Add("@id", SqlDbType.Int).Value = idUsuario;
+
+            if (cmd.ExecuteNonQuery() == 0)
+            {
+                error = "El usuario no existe.";
+                return false;
+            }
+            return true;
+        }
+        catch (SqlException ex) when (ex.Number == 547)   // tiene préstamos o reservas registrados
+        {
+            error = "No se puede eliminar: este usuario tiene préstamos o reservas registrados.";
+            return false;
+        }
+    }
+}

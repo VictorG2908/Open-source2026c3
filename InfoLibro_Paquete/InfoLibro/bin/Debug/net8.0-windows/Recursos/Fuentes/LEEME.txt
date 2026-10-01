@@ -1,0 +1,13 @@
+FUENTES DE INFOLIBRO
+====================
+Pon aquí los archivos .ttf (o .otf) y el programa los carga solo, sin instalarlos.
+
+  Títulos / logo (gótica):  nombre exacto de la fuente que uses en tu Figma.
+  Texto general (redondeada): Comfortaa  (Google Fonts, descarga la versión estática .ttf)
+
+Si tu fuente del logo NO es una de estas, abre Utilidades/Tema.cs y agrega su nombre
+(el que aparece en Figma) al inicio de la lista FuentesTitulo:
+  UnifrakturCook, Pirata One, Jacquard 12, MedievalSharp, Uncial Antiqua, Blackadder ITC, Old English Text MT
+
+Sin ninguna fuente, el programa usa Georgia (títulos) y Segoe UI (texto).
+Después de agregar archivos aquí, vuelve a compilar (Ctrl+Shift+B) para que se copien al .exe.

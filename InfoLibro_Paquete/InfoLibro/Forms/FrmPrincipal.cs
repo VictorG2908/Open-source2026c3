@@ -1,0 +1,196 @@
+using System.Drawing;
+using System.Windows.Forms;
+using InfoLibro.Modelos;
+using InfoLibro.Seguridad;
+using InfoLibro.Utilidades;
+
+namespace InfoLibro.Forms;
+
+/// <summary>
+/// Menú principal: menú lateral (como la barra inferior del Figma) + saludo + contenido.
+/// Las opciones que se muestran dependen del rol de quien inició sesión.
+/// </summary>
+public class FrmPrincipal : Form
+{
+    class Modulo
+    {
+        public string Texto;
+        public string Icono;
+        public Accion Requiere;      // permiso necesario para ver/abrir el módulo
+        public Func<Form> Crear;
+        public BotonMenu Boton;
+    }
+
+    readonly List<Modulo> modulos = new List<Modulo>();
+    readonly PanelDoble pnlContenedor = new PanelDoble { Dock = DockStyle.Fill, BackColor = Color.White };
+    Form formActual;
+
+    /// <summary>true si el usuario eligió "Cerrar sesión" (vuelve al login); false si eligió Salir.</summary>
+    public bool VolverAlLogin { get; private set; }
+
+    public FrmPrincipal()
+    {
+        Text = "InfoLibro";
+        ClientSize = new Size(1200, 720);
+        MinimumSize = new Size(1000, 640);
+        StartPosition = FormStartPosition.CenterScreen;
+        BackColor = Color.White;
+
+        // Módulos de la aplicación (Préstamos y Reservas se construyen en etapas siguientes)
+        modulos.Add(new Modulo { Texto = "Inicio", Icono = "icono_inicio.png", Requiere = Accion.Consultar, Crear = () => new FrmInicio() });
+        modulos.Add(new Modulo { Texto = "Préstamos", Icono = "icono_prestamos.png", Requiere = Accion.Consultar, Crear = () => new FrmProximamente("Préstamos") });
+        modulos.Add(new Modulo { Texto = "Reservas", Icono = "icono_reservas.png", Requiere = Accion.Consultar, Crear = () => new FrmProximamente("Reservas") });
+        modulos.Add(new Modulo { Texto = "Perfil", Icono = "icono_perfil.png", Requiere = Accion.Consultar, Crear = () => new FrmPerfil() });
+        modulos.Add(new Modulo { Texto = "Usuarios", Icono = "icono_usuarios.png", Requiere = Accion.Administrar, Crear = () => new FrmUsuarios() });
+        modulos.Add(new Modulo { Texto = "Roles", Icono = "icono_roles.png", Requiere = Accion.Administrar, Crear = () => new FrmRoles() });
+
+        MenuStrip menu = ConstruirMenu();
+        Panel lateral = ConstruirLateral();
+        Panel derecha = ConstruirDerecha();
+
+        var cuerpo = new Panel { Dock = DockStyle.Fill };
+        cuerpo.Controls.Add(derecha);   // el que llena va primero
+        cuerpo.Controls.Add(lateral);
+
+        Controls.Add(cuerpo);
+        Controls.Add(menu);
+        MainMenuStrip = menu;
+
+        Load += (s, e) => Abrir(modulos[0]);
+    }
+
+    // ---------- Menú superior (Archivo / Ir a / Ayuda) ----------
+    MenuStrip ConstruirMenu()
+    {
+        var menu = new MenuStrip { BackColor = Color.White, Dock = DockStyle.Top };
+
+        var archivo = new ToolStripMenuItem("&Archivo");
+        archivo.DropDownItems.Add("Cerrar sesión", null, (s, e) => CerrarSesion());
+        archivo.DropDownItems.Add(new ToolStripSeparator());
+        archivo.DropDownItems.Add("Salir", null, (s, e) => Salir());
+
+        var ir = new ToolStripMenuItem("&Ir a");
+        foreach (Modulo m in modulos)
+        {
+            if (!Permisos.Tiene(m.Requiere)) continue;   // solo lo que su rol permite
+            Modulo modulo = m;
+            ir.DropDownItems.Add(modulo.Texto, null, (s, e) => Abrir(modulo));
+        }
+
+        var ayuda = new ToolStripMenuItem("A&yuda");
+        ayuda.DropDownItems.Add("Acerca de InfoLibro", null, (s, e) =>
+            MessageBox.Show("InfoLibro - Sistema de Gestión de Biblioteca\nEtapa I: Login y Roles\n\nDesarrollo de Software con Tecnologías Propietarias y Open Source I (ISO-615)",
+                "Acerca de", MessageBoxButtons.OK, MessageBoxIcon.Information));
+
+        menu.Items.AddRange(new ToolStripItem[] { archivo, ir, ayuda });
+        return menu;
+    }
+
+    // ---------- Menú lateral naranja ----------
+    Panel ConstruirLateral()
+    {
+        var panel = new Panel { Dock = DockStyle.Left, Width = 240, BackColor = Tema.Naranja };
+
+        Label logo = Tema.Etiqueta("InfoLibro", Tema.FuenteTitulo(30f), Color.White);
+        logo.SetBounds(0, 24, 240, 80);
+        logo.TextAlign = ContentAlignment.MiddleCenter;
+        panel.Controls.Add(logo);
+
+        int y = 120;
+        foreach (Modulo m in modulos)
+        {
+            if (!Permisos.Tiene(m.Requiere)) continue;   // el rol decide qué opciones ve
+
+            Modulo modulo = m;
+            var boton = new BotonMenu { Text = m.Texto, Icono = Recurso.Imagen(m.Icono) };
+            boton.SetBounds(0, y, 240, 54);
+            boton.Click += (s, e) => Abrir(modulo);
+            m.Boton = boton;
+            panel.Controls.Add(boton);
+            y += 58;
+        }
+
+        var cerrar = new BotonMenu { Text = "Cerrar sesión", Icono = Recurso.Imagen("icono_salir.png"), Dock = DockStyle.Bottom };
+        cerrar.Click += (s, e) => CerrarSesion();
+        panel.Controls.Add(cerrar);
+
+        return panel;
+    }
+
+    // ---------- Lado derecho: saludo + rol + contenido ----------
+    Panel ConstruirDerecha()
+    {
+        var derecha = new Panel { Dock = DockStyle.Fill };
+
+        var encabezado = new PanelDoble { Dock = DockStyle.Top, Height = 90, BackColor = Color.White };
+
+        Label saludo = Tema.Etiqueta($"Hi, {Sesion.UsuarioActual.PrimerNombre}!", Tema.FuenteTitulo(30f), Tema.Naranja);
+        saludo.SetBounds(32, 14, 700, 62);
+        saludo.TextAlign = ContentAlignment.MiddleLeft;
+
+        var rol = new BotonRedondo
+        {
+            Text = Sesion.RolActual.NombreRol,
+            Size = new Size(180, 38),
+            Top = 26,
+            SoloLectura = true,
+            ColorNormal = Tema.NaranjaClaro,
+            ColorLetra = Tema.Cafe,
+            Font = Tema.FuenteTexto(11f, FontStyle.Bold)
+        };
+
+        encabezado.Controls.Add(saludo);
+        encabezado.Controls.Add(rol);
+        encabezado.Resize += (s, e) => rol.Left = encabezado.Width - rol.Width - 32;
+        encabezado.Paint += (s, e) =>
+        {
+            using var lapiz = new Pen(Tema.NaranjaClaro, 2f);
+            e.Graphics.DrawLine(lapiz, 0, encabezado.Height - 1, encabezado.Width, encabezado.Height - 1);
+        };
+
+        derecha.Controls.Add(pnlContenedor);   // el que llena va primero
+        derecha.Controls.Add(encabezado);
+        return derecha;
+    }
+
+    // ---------- Navegación entre formularios ----------
+    void Abrir(Modulo m)
+    {
+        // Control de acceso: aunque el botón no se vea, se vuelve a comprobar el permiso.
+        if (!Permisos.Verificar(m.Requiere, $"abrir el módulo {m.Texto}")) return;
+
+        foreach (Modulo x in modulos)
+        {
+            if (x.Boton != null) x.Boton.Seleccionado = ReferenceEquals(x, m);
+        }
+
+        Form anterior = formActual;
+        formActual = m.Crear();
+        formActual.TopLevel = false;
+        formActual.FormBorderStyle = FormBorderStyle.None;
+        formActual.Dock = DockStyle.Fill;
+
+        pnlContenedor.Controls.Clear();
+        pnlContenedor.Controls.Add(formActual);
+        formActual.Show();
+        anterior?.Dispose();
+
+        Text = $"InfoLibro - {m.Texto}";
+    }
+
+    void CerrarSesion()
+    {
+        if (MessageBox.Show("¿Deseas cerrar tu sesión?", "Cerrar sesión",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        VolverAlLogin = true;
+        Close();
+    }
+
+    void Salir()
+    {
+        if (MessageBox.Show("¿Seguro que quieres salir de InfoLibro?", "Salir",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        VolverAlLogin = false;
+        Close();
+    }
+}
