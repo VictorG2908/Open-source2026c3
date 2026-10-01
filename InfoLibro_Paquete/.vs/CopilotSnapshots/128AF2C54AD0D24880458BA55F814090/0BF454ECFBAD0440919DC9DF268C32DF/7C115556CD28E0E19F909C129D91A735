@@ -1,0 +1,47 @@
+﻿using System.Drawing;
+using System.Windows.Forms;
+using InfoLibro.Datos;
+using InfoLibro.Forms;
+using InfoLibro.Seguridad;
+using InfoLibro.Utilidades;
+
+namespace InfoLibro;
+
+internal static class Program
+{
+    [STAThread]
+    static void Main()
+    {
+        ApplicationConfiguration.Initialize();
+        Tema.Inicializar();
+
+        if (!Conexion.Probar(out string errorConexion))
+        {
+            MessageBox.Show(
+                "No se pudo conectar con la base de datos InfoLibro.\n\n" +
+                "1) Ejecuta el script SQL\\InfoLibro_BaseDeDatos.sql en SQL Server (SSMS).\n" +
+                "2) Revisa la cadena de conexión en Datos\\Conexion.cs.\n\n" +
+                "Detalle: " + errorConexion,
+                "Error de conexión", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        // Flujo: Login -> Menú principal -> (Cerrar sesión vuelve al Login)
+        bool seguir = true;
+        while (seguir)
+        {
+            using (var login = new FrmLogin())
+            {
+                if (login.ShowDialog() != DialogResult.OK) break;   // Salir o cerrar ventana
+            }
+
+            using (var principal = new FrmPrincipal())
+            {
+                principal.ShowDialog();
+                seguir = principal.VolverAlLogin;
+            }
+
+            Sesion.Cerrar();
+        }
+    }
+}

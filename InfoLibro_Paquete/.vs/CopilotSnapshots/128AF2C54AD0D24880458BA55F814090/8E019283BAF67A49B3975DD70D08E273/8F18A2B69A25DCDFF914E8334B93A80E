@@ -1,0 +1,5 @@
+﻿{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Database=InfoLibroDB;Trusted_Connection=True;TrustServerCertificate=True;"
+  }
+}

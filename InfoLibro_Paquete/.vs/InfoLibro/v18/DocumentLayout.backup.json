@@ -3,8 +3,48 @@
   "WorkspaceRootPath": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\forms\\frmprincipal.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\forms\\frmprincipal.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\datos\\usuariodatos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\datos\\usuariodatos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\datos\\infolibrodbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\datos\\infolibrodbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\infolibro.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\infolibro.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\datos\\infolibroprogramconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\datos\\infolibroprogramconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\datos\\roldatos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\datos\\roldatos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\modelos\\usuario.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\modelos\\usuario.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\seguridad\\sesion.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\seguridad\\sesion.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|c:\\users\\1\\onedrive\\desktop\\infolibro_paquete\\infolibro\\forms\\frminicio.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-4000-8000-000000000001}|InfoLibro\\InfoLibro.csproj|solutionrelative:infolibro\\forms\\frminicio.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -14,19 +54,149 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "FrmInicio.cs",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Forms\\FrmInicio.cs",
+              "RelativeDocumentMoniker": "InfoLibro\\Forms\\FrmInicio.cs",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Forms\\FrmInicio.cs",
+              "RelativeToolTip": "InfoLibro\\Forms\\FrmInicio.cs",
+              "ViewState": "AgIAABYAAAAAAAAAAIBJwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T05:34:31.702Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "FrmPrincipal.cs",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Forms\\FrmPrincipal.cs",
+              "RelativeDocumentMoniker": "InfoLibro\\Forms\\FrmPrincipal.cs",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Forms\\FrmPrincipal.cs",
+              "RelativeToolTip": "InfoLibro\\Forms\\FrmPrincipal.cs",
+              "ViewState": "AgIAAHgAAAAAAAAAAAAAAIIAAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T05:23:18.719Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "Sesion.cs",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Seguridad\\Sesion.cs",
+              "RelativeDocumentMoniker": "InfoLibro\\Seguridad\\Sesion.cs",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Seguridad\\Sesion.cs",
+              "RelativeToolTip": "InfoLibro\\Seguridad\\Sesion.cs",
+              "ViewState": "AgIAAAEAAAAAAAAAAIBJwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T05:24:49.88Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "RolDatos.cs",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Datos\\RolDatos.cs",
+              "RelativeDocumentMoniker": "InfoLibro\\Datos\\RolDatos.cs",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Datos\\RolDatos.cs",
+              "RelativeToolTip": "InfoLibro\\Datos\\RolDatos.cs",
+              "ViewState": "AgIAAAIAAAAAAAAAAIBJwAQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T04:47:28.812Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "InfoLibroProgramConfiguration.cs",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Datos\\InfoLibroProgramConfiguration.cs",
+              "RelativeDocumentMoniker": "InfoLibro\\Datos\\InfoLibroProgramConfiguration.cs",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Datos\\InfoLibroProgramConfiguration.cs",
+              "RelativeToolTip": "InfoLibro\\Datos\\InfoLibroProgramConfiguration.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T04:46:57.294Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Program.cs",
+              "RelativeDocumentMoniker": "InfoLibro\\Program.cs",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Program.cs",
+              "RelativeToolTip": "InfoLibro\\Program.cs",
+              "ViewState": "AgIAAHMAAAAAAAAAAIBJwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T04:17:12.727Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "InfoLibroDbContext.cs",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Datos\\InfoLibroDbContext.cs",
+              "RelativeDocumentMoniker": "InfoLibro\\Datos\\InfoLibroDbContext.cs",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Datos\\InfoLibroDbContext.cs",
+              "RelativeToolTip": "InfoLibro\\Datos\\InfoLibroDbContext.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACMAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T04:16:37.007Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\appsettings.json",
+              "RelativeDocumentMoniker": "appsettings.json",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\appsettings.json",
+              "RelativeToolTip": "appsettings.json",
+              "ViewState": "AgIAAAIAAAAAAAAAAABBwAUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-10-01T04:16:32.467Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "UsuarioDatos.cs",
               "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Datos\\UsuarioDatos.cs",
               "RelativeDocumentMoniker": "InfoLibro\\Datos\\UsuarioDatos.cs",
               "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Datos\\UsuarioDatos.cs",
               "RelativeToolTip": "InfoLibro\\Datos\\UsuarioDatos.cs",
-              "ViewState": "AgIAAJMAAAAAAAAAAIAwwAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAACgAAAAAAAAAAAAgwAQAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-10-01T02:40:03.155Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "Usuario.cs",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Modelos\\Usuario.cs",
+              "RelativeDocumentMoniker": "InfoLibro\\Modelos\\Usuario.cs",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\Modelos\\Usuario.cs",
+              "RelativeToolTip": "InfoLibro\\Modelos\\Usuario.cs",
+              "ViewState": "AgIAAAoAAAAAAAAAAABgwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T05:04:37.173Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "InfoLibro",
+              "DocumentMoniker": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\InfoLibro.csproj",
+              "RelativeDocumentMoniker": "InfoLibro\\InfoLibro.csproj",
+              "ToolTip": "C:\\Users\\1\\OneDrive\\Desktop\\InfoLibro_Paquete\\InfoLibro\\InfoLibro.csproj",
+              "RelativeToolTip": "InfoLibro\\InfoLibro.csproj",
+              "ViewState": "AgIAABEAAAAAAAAAAABBwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-10-01T04:17:45.54Z",
               "EditorCaption": ""
             }
           ]

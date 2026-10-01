@@ -1,0 +1,170 @@
+﻿using System.Drawing;
+using System.Windows.Forms;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using InfoLibro.Datos;
+using InfoLibro.Forms;
+using InfoLibro.Seguridad;
+using InfoLibro.Utilidades;
+using InfoLibro.Modelos;
+
+namespace InfoLibro;
+
+internal static class Program
+{
+    [STAThread]
+    static void Main()
+    {
+        ApplicationConfiguration.Initialize();
+        Tema.Inicializar();
+
+        // Npgsql timestamp behavior: permitir comportamiento legado (opcional)
+        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
+        // Leer configuración (appsettings.json)
+        var config = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .Build();
+
+        string conn = config.GetConnectionString("DefaultConnection")
+            ?? config["ConnectionStrings:DefaultConnection"]
+            ?? "Host=pg-1cd82588-victorguillermo298-b5b6.j.aivencloud.com;Port=20508;Database=defaultdb;Username=avnadmin;Password=AVNS_34n8lozvFOC4EWW8ExK;Ssl Mode=Require;";
+
+        // Guardar en configuración global para que los repositorios EF puedan usarla
+        InfoLibroProgramConfiguration.ConnectionString = conn;
+
+        // NOTA: la capa ADO.NET anterior (SqlConnection) NO es compatible con PostgreSQL.
+        // Conexion.CadenaConexion ya no se asigna automáticamente al URI de PostgreSQL.
+
+        // Configurar DbContext (PostgreSQL) y ejecutar seeder
+        var options = new DbContextOptionsBuilder<InfoLibroDbContext>()
+            .UseNpgsql(conn)
+            .Options;
+
+        try
+        {
+            using (var context = new InfoLibroDbContext(options))
+            {
+                // Crear la base de datos si no existe y aplicar el esquema mínimo
+                context.Database.EnsureCreated();
+
+                // Seeder obligatorio: asegurar roles y usuarios requeridos de la Etapa I
+                //  - No depender de si la tabla Usuarios está vacía; verificar y crear por usuario si falta.
+
+                var requiredRoles = new[] { "Administrador", "Supervisor", "Ejecutor" };
+                var existingRoles = context.Roles.Where(r => requiredRoles.Contains(r.NombreRol)).Select(r => r.NombreRol).ToList();
+                var rolesToAdd = new List<Rol>();
+                if (!existingRoles.Contains("Administrador")) rolesToAdd.Add(new Rol { NombreRol = "Administrador", PuedeAdministrar = true, PuedeAgregar = true, PuedeConsultar = true, PuedeModificar = true, PuedeEliminar = true });
+                if (!existingRoles.Contains("Supervisor")) rolesToAdd.Add(new Rol { NombreRol = "Supervisor", PuedeAdministrar = false, PuedeAgregar = false, PuedeConsultar = true, PuedeModificar = true, PuedeEliminar = false });
+                if (!existingRoles.Contains("Ejecutor")) rolesToAdd.Add(new Rol { NombreRol = "Ejecutor", PuedeAdministrar = false, PuedeAgregar = true, PuedeConsultar = true, PuedeModificar = false, PuedeEliminar = false });
+
+                if (rolesToAdd.Count > 0)
+                {
+                    context.Roles.AddRange(rolesToAdd);
+                    context.SaveChanges();
+                }
+
+                // Recuperar roles persistidos
+                var rolAdminDb = context.Roles.First(r => r.NombreRol == "Administrador");
+                var rolSupervisorDb = context.Roles.First(r => r.NombreRol == "Supervisor");
+                var rolEjecutorDb = context.Roles.First(r => r.NombreRol == "Ejecutor");
+
+                // Eliminar usuario antiguo 'user' si existe
+                var usuarioOld = context.Usuarios.FirstOrDefault(u => EF.Functions.ILike(u.NombreUsuario, "user"));
+                if (usuarioOld != null)
+                {
+                    context.Usuarios.Remove(usuarioOld);
+                    context.SaveChanges();
+                }
+
+                // Verificar e insertar usuarios requeridos individualmente
+                var usersToEnsure = new[] {
+                    new { User = "admin", RolId = rolAdminDb.IdRol, Nombre = "Administrador", Correo = "admin@infolibro.com", Clave = "admin123" },
+                    new { User = "supervisor", RolId = rolSupervisorDb.IdRol, Nombre = "Supervisor", Correo = "supervisor@infolibro.com", Clave = "supervisor123" },
+                    new { User = "ejecutor", RolId = rolEjecutorDb.IdRol, Nombre = "Ejecutor", Correo = "ejecutor@infolibro.com", Clave = "ejecutor123" }
+                };
+
+                foreach (var uinfo in usersToEnsure)
+                {
+                    if (!context.Usuarios.Any(u => EF.Functions.ILike(u.NombreUsuario, uinfo.User)))
+                    {
+                        var salt = Hash.GenerarSalt();
+                        var hash = Hash.Calcular(uinfo.Clave, salt);
+                        var nuevo = new Usuario
+                        {
+                            NombreUsuario = uinfo.User,
+                            NombreCompleto = uinfo.Nombre,
+                            Correo = uinfo.Correo,
+                            Salt = salt,
+                            ClaveHash = hash,
+                            IdRol = uinfo.RolId,
+                            Activo = true,
+                            FechaRegistro = DateTime.UtcNow
+                        };
+                        context.Usuarios.Add(nuevo);
+                    }
+                }
+
+                try
+                {
+                    context.SaveChanges();
+                }
+                catch (DbUpdateException dbEx)
+                {
+                    MessageBox.Show("Error al guardar usuarios en la base de datos: " + (dbEx.InnerException?.Message ?? dbEx.Message),
+                        "Error de inicialización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+        catch (DbUpdateException dbEx)
+        {
+            MessageBox.Show("Error al inicializar la base de datos (DbUpdateException): " + (dbEx.InnerException?.Message ?? dbEx.Message),
+                "Error de inicialización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Error al inicializar la base de datos: " + ex.Message,
+                "Error de inicialización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            // Continuamos para permitir que la app muestre el error de conexión original si aplica
+        }
+
+        // Probar conexión usando EF Core (Npgsql)
+        try
+        {
+            using var testCtx = new InfoLibroDbContext(options);
+            if (!testCtx.Database.CanConnect())
+            {
+                MessageBox.Show(
+                    "No se pudo conectar con la base de datos PostgreSQL (Aiven).\n\n" +
+                    "Revisa la cadena de conexión en appsettings.json y la accesibilidad de la instancia Aiven.",
+                    "Error de conexión", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("No se pudo conectar con la base de datos PostgreSQL: " + ex.Message,
+                "Error de conexión", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        // Flujo: Login -> Menú principal -> (Cerrar sesión vuelve al Login)
+        bool seguir = true;
+        while (seguir)
+        {
+            using (var login = new FrmLogin())
+            {
+                if (login.ShowDialog() != DialogResult.OK) break;   // Salir o cerrar ventana
+            }
+
+            using (var principal = new FrmPrincipal())
+            {
+                principal.ShowDialog();
+                seguir = principal.VolverAlLogin;
+            }
+
+            Sesion.Cerrar();
+        }
+    }
+}

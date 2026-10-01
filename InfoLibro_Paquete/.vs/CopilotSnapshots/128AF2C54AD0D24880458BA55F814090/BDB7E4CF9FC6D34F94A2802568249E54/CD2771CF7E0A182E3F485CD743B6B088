@@ -1,0 +1,5 @@
+﻿{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=pg-1cd82588-victorguillermo298-b5b6.j.aivencloud.com;Port=20508;Database=defaultdb;Username=avnadmin;Password=AVNS_34n8lozvFOC4EWW8ExK;Ssl Mode=Require;"
+  }
+}

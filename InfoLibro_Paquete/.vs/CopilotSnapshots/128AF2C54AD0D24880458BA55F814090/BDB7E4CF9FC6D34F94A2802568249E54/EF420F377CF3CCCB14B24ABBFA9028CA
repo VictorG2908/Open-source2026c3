@@ -1,0 +1,5 @@
+﻿{
+  "ConnectionStrings": {
+    "DefaultConnection": "postgres://avnadmin:AVNS_34n8lozvFOC4EWW8ExK@pg-1cd82588-victorguillermo298-b5b6.j.aivencloud.com:20508/defaultdb?sslmode=require"
+  }
+}

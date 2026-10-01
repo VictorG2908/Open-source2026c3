@@ -11,7 +11,7 @@ public class Usuario
     public int IdRol { get; set; }
     public Rol Rol { get; set; }
     public bool Activo { get; set; } = true;
-    public DateTime FechaRegistro { get; set; } = DateTime.Now;
+    public DateTime FechaRegistro { get; set; } = DateTime.UtcNow;
 
     /// <summary>Primer nombre, para el saludo "Hi, Pedro!".</summary>
     public string PrimerNombre

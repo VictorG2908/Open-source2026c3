@@ -20,12 +20,12 @@ public class FrmInicio : Form
         BackColor = Color.White;
         Rol rol = Sesion.RolActual;
 
-        Label titulo = Tema.Etiqueta("Panel de inicio", Tema.FuenteTexto(22f, FontStyle.Bold), Tema.ColorTexto);
-        titulo.SetBounds(40, 20, 700, 48);
+                Label titulo = Tema.Etiqueta("Panel de inicio", Tema.FuenteTexto(22f, FontStyle.Bold), Tema.ColorTexto);
+                titulo.SetBounds(40, 20, 700, 48);
 
-        Label sub = Tema.Etiqueta(
-            $"Sesión iniciada como \"{Sesion.UsuarioActual.NombreUsuario}\" con el rol {rol.NombreRol}. Estos son tus permisos:",
-            Tema.FuenteTexto(11f), Tema.ColorTextoSuave);
+                Label sub = Tema.Etiqueta(
+                    $"Sesión iniciada como \"{Sesion.UsuarioActual?.NombreUsuario ?? ""}\" con el rol {rol?.NombreRol ?? "Sin Rol"}. Estos son tus permisos:",
+                    Tema.FuenteTexto(11f), Tema.ColorTextoSuave);
         sub.SetBounds(40, 72, 900, 28);
 
         Controls.Add(titulo);

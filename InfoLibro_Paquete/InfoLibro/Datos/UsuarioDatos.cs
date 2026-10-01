@@ -1,7 +1,9 @@
-using System.Data;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using InfoLibro.Modelos;
 using InfoLibro.Seguridad;
-using Microsoft.Data.SqlClient;
 
 namespace InfoLibro.Datos;
 
@@ -14,10 +16,6 @@ public class ResultadoLogin
     public bool Bloqueado { get; set; }
 }
 
-/// <summary>
-/// Acceso a la tabla Usuarios (ADO.NET). Todas las consultas usan parámetros (@usuario, @id...)
-/// para evitar inyección SQL: el texto que escribe el usuario nunca se pega dentro del SQL.
-/// </summary>
 public static class UsuarioDatos
 {
     public const int MaxIntentos = 3;
@@ -27,64 +25,47 @@ public static class UsuarioDatos
     static readonly Dictionary<string, int> intentos = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
     static readonly Dictionary<string, DateTime> bloqueos = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
 
-    const string ConsultaBase = @"
-        SELECT u.IdUsuario, u.NombreUsuario, u.NombreCompleto, u.Correo, u.ClaveHash, u.Salt,
-               u.IdRol, u.Activo, u.FechaRegistro,
-               r.NombreRol, r.PuedeConsultar, r.PuedeAgregar, r.PuedeModificar, r.PuedeEliminar, r.PuedeAdministrar
-        FROM Usuarios u
-        INNER JOIN Roles r ON r.IdRol = u.IdRol ";
-
-    static Usuario Leer(SqlDataReader rd)
-    {
-        return new Usuario
-        {
-            IdUsuario = (int)rd["IdUsuario"],
-            NombreUsuario = (string)rd["NombreUsuario"],
-            NombreCompleto = (string)rd["NombreCompleto"],
-            Correo = (string)rd["Correo"],
-            ClaveHash = (string)rd["ClaveHash"],
-            Salt = (string)rd["Salt"],
-            IdRol = (int)rd["IdRol"],
-            Activo = (bool)rd["Activo"],
-            FechaRegistro = (DateTime)rd["FechaRegistro"],
-            Rol = RolDatos.LeerRol(rd)
-        };
-    }
-
     static Usuario ObtenerPorNombre(string nombreUsuario)
     {
-        using var cn = Conexion.Crear();
-        cn.Open();
-        using var cmd = new SqlCommand(ConsultaBase + "WHERE u.NombreUsuario = @usuario", cn);
-        cmd.Parameters.Add("@usuario", SqlDbType.NVarChar, 30).Value = nombreUsuario;
-        using var rd = cmd.ExecuteReader();
-        return rd.Read() ? Leer(rd) : null;
+        using var db = CreateContext();
+        nombreUsuario = (nombreUsuario ?? "").Trim();
+        return db.Usuarios.Include(u => u.Rol)
+            .FirstOrDefault(u => EF.Functions.ILike(u.NombreUsuario, nombreUsuario));
     }
 
     public static ResultadoLogin ValidarCredenciales(string nombreUsuario, string clave)
     {
         nombreUsuario = (nombreUsuario ?? "").Trim();
 
-        // ¿Está bloqueado por demasiados intentos?
-        if (bloqueos.TryGetValue(nombreUsuario, out DateTime hasta))
-        {
-            if (DateTime.Now < hasta)
-            {
-                int minutos = (int)Math.Ceiling((hasta - DateTime.Now).TotalMinutes);
-                return new ResultadoLogin
-                {
-                    Bloqueado = true,
-                    Mensaje = $"Demasiados intentos fallidos. Intenta de nuevo en {minutos} minuto(s)."
-                };
-            }
-            bloqueos.Remove(nombreUsuario);
-            intentos.Remove(nombreUsuario);
-        }
-
+        // Obtener usuario desde la BD (ObtenerPorNombre usa ILike para PostgreSQL)
         Usuario u = ObtenerPorNombre(nombreUsuario);
 
-        bool correcto = u != null && u.Activo &&
-            string.Equals(Hash.Calcular(clave, u.Salt), u.ClaveHash, StringComparison.OrdinalIgnoreCase);
+        // ¿Está bloqueado por demasiados intentos?
+        bool isBlocked = bloqueos.TryGetValue(nombreUsuario, out DateTime hasta) && DateTime.Now < hasta;
+        int minutosRestantes = isBlocked ? (int)Math.Ceiling((hasta - DateTime.Now).TotalMinutes) : 0;
+
+        bool isActive = u != null && u.Activo;
+        bool hashMatch = false;
+        try
+        {
+            if (u != null)
+                hashMatch = string.Equals(Hash.Calcular(clave, u.Salt), u.ClaveHash, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            hashMatch = false;
+        }
+
+        if (isBlocked)
+        {
+            return new ResultadoLogin
+            {
+                Bloqueado = true,
+                Mensaje = $"Demasiados intentos fallidos. Intenta de nuevo en {minutosRestantes} minuto(s)."
+            };
+        }
+
+        bool correcto = isActive && hashMatch;
 
         if (correcto)
         {
@@ -116,74 +97,58 @@ public static class UsuarioDatos
 
     public static List<Usuario> ObtenerTodos()
     {
-        var lista = new List<Usuario>();
-        using var cn = Conexion.Crear();
-        cn.Open();
-        using var cmd = new SqlCommand(ConsultaBase + "ORDER BY u.IdUsuario", cn);
-        using var rd = cmd.ExecuteReader();
-        while (rd.Read()) lista.Add(Leer(rd));
-        return lista;
+        using var db = CreateContext();
+        return db.Usuarios.Include(u => u.Rol).OrderBy(u => u.IdUsuario).ToList();
     }
 
     public static bool Crear(Usuario u, string clave, out string error)
     {
-        // Si no hay usuarios en la BD (instalación inicial) permitimos crear el primero
-        // sin exigir permisos. En instalaciones normales se requiere el permiso Administrar.
         error = null;
 
-        bool requiereAdmin = true;
-        try
-        {
-            using var cnCheck = Conexion.Crear();
-            cnCheck.Open();
-            using var cmdCheck = new SqlCommand("SELECT COUNT(*) FROM Usuarios", cnCheck);
-            var cnt = cmdCheck.ExecuteScalar();
-            if (cnt != null && Convert.ToInt32(cnt) == 0) requiereAdmin = false;
-        }
-        catch
-        {
-            // Si no podemos comprobar, mantener la exigencia por seguridad.
-            requiereAdmin = true;
-        }
+        using var db = CreateContext();
 
+        // Si no hay usuarios en la BD (instalación inicial) permitimos crear el primero sin exigir permisos
+        bool requiereAdmin = db.Usuarios.Any();
         if (requiereAdmin) Permisos.Exigir(Accion.Administrar, "crear usuarios");
 
-        string salt = Hash.GenerarSalt();
-        string hash = Hash.Calcular(clave, salt);
-
-        try
+        // Validaciones previas
+        if (string.IsNullOrWhiteSpace(u.NombreUsuario))
         {
-            using var cn = Conexion.Crear();
-            cn.Open();
-            using var cmd = new SqlCommand(@"
-                INSERT INTO Usuarios (NombreUsuario, NombreCompleto, Correo, ClaveHash, Salt, IdRol, Activo, FechaRegistro)
-                VALUES (@usuario, @nombre, @correo, @hash, @salt, @idRol, @activo, @fecha);
-                SELECT CAST(SCOPE_IDENTITY() AS INT);", cn);
-            cmd.Parameters.Add("@usuario", SqlDbType.NVarChar, 30).Value = u.NombreUsuario;
-            cmd.Parameters.Add("@nombre", SqlDbType.NVarChar, 100).Value = u.NombreCompleto;
-            cmd.Parameters.Add("@correo", SqlDbType.NVarChar, 120).Value = u.Correo;
-            cmd.Parameters.Add("@hash", SqlDbType.Char, 64).Value = hash;
-            cmd.Parameters.Add("@salt", SqlDbType.VarChar, 50).Value = salt;
-            cmd.Parameters.Add("@idRol", SqlDbType.Int).Value = u.IdRol;
-            cmd.Parameters.Add("@activo", SqlDbType.Bit).Value = u.Activo;
-            cmd.Parameters.Add("@fecha", SqlDbType.DateTime).Value = u.FechaRegistro;
-
-            u.IdUsuario = (int)cmd.ExecuteScalar();
-            return true;
+            error = "El nombre de usuario es obligatorio.";
+            return false;
         }
-        catch (SqlException ex) when (ex.Number == 2627 || ex.Number == 2601)   // usuario duplicado
+
+        if (db.Usuarios.Any(x => x.NombreUsuario.ToLower() == u.NombreUsuario.ToLower()))
         {
             error = "Ya existe un usuario con ese nombre.";
             return false;
         }
-        catch (SqlException ex) when (ex.Number == 547)                          // rol inexistente
+
+        var rol = db.Roles.Find(u.IdRol);
+        if (rol == null)
         {
             error = "El rol seleccionado no existe.";
             return false;
         }
+
+        u.Salt = Hash.GenerarSalt();
+        u.ClaveHash = Hash.Calcular(clave, u.Salt);
+        u.Activo = u.Activo;
+        u.FechaRegistro = u.FechaRegistro == default ? DateTime.UtcNow : u.FechaRegistro;
+
+        try
+        {
+            db.Usuarios.Add(u);
+            db.SaveChanges();
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            error = ex.InnerException?.Message ?? ex.Message;
+            return false;
+        }
         catch (Exception ex)
         {
-            // Capturar cualquier otro error y devolver el mensaje para que la UI lo muestre
             error = ex.Message;
             return false;
         }
@@ -193,25 +158,17 @@ public static class UsuarioDatos
     {
         Permisos.Exigir(Accion.Administrar, "restablecer contraseñas");
 
-        string salt = Hash.GenerarSalt();
-        string hash = Hash.Calcular(nuevaClave, salt);
+        using var db = CreateContext();
+        var u = db.Usuarios.Find(idUsuario);
+        if (u == null) return false;
 
-        using var cn = Conexion.Crear();
-        cn.Open();
-        using var cmd = new SqlCommand(@"
-            UPDATE Usuarios SET ClaveHash = @hash, Salt = @salt
-            OUTPUT inserted.NombreUsuario
-            WHERE IdUsuario = @id", cn);
-        cmd.Parameters.Add("@hash", SqlDbType.Char, 64).Value = hash;
-        cmd.Parameters.Add("@salt", SqlDbType.VarChar, 50).Value = salt;
-        cmd.Parameters.Add("@id", SqlDbType.Int).Value = idUsuario;
-
-        string nombre = cmd.ExecuteScalar() as string;
-        if (nombre == null) return false;
+        u.Salt = Hash.GenerarSalt();
+        u.ClaveHash = Hash.Calcular(nuevaClave, u.Salt);
+        db.SaveChanges();
 
         // También desbloquea al usuario si estaba bloqueado
-        bloqueos.Remove(nombre);
-        intentos.Remove(nombre);
+        bloqueos.Remove(u.NombreUsuario);
+        intentos.Remove(u.NombreUsuario);
         return true;
     }
 
@@ -226,24 +183,33 @@ public static class UsuarioDatos
             return false;
         }
 
+        using var db = CreateContext();
+        var u = db.Usuarios.Find(idUsuario);
+        if (u == null)
+        {
+            error = "El usuario no existe.";
+            return false;
+        }
+
         try
         {
-            using var cn = Conexion.Crear();
-            cn.Open();
-            using var cmd = new SqlCommand("DELETE FROM Usuarios WHERE IdUsuario = @id", cn);
-            cmd.Parameters.Add("@id", SqlDbType.Int).Value = idUsuario;
-
-            if (cmd.ExecuteNonQuery() == 0)
-            {
-                error = "El usuario no existe.";
-                return false;
-            }
+            db.Usuarios.Remove(u);
+            db.SaveChanges();
             return true;
         }
-        catch (SqlException ex) when (ex.Number == 547)   // tiene préstamos o reservas registrados
+        catch (DbUpdateException ex)
         {
+            // Probablemente restricciones FK (préstamos/reservas)
             error = "No se puede eliminar: este usuario tiene préstamos o reservas registrados.";
             return false;
         }
+    }
+
+    static InfoLibroDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<InfoLibroDbContext>()
+            .UseNpgsql(InfoLibroProgramConfiguration.GetConnectionString())
+            .Options;
+        return new InfoLibroDbContext(options);
     }
 }

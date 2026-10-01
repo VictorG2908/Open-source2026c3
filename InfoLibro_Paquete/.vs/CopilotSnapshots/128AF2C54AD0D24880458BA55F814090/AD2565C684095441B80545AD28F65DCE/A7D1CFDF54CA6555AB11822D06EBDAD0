@@ -1,0 +1,184 @@
+﻿using System.Drawing;
+using System.Windows.Forms;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using InfoLibro.Datos;
+using InfoLibro.Forms;
+using InfoLibro.Seguridad;
+using InfoLibro.Utilidades;
+using InfoLibro.Modelos;
+
+namespace InfoLibro;
+
+internal static class Program
+{
+    [STAThread]
+    static void Main()
+    {
+        ApplicationConfiguration.Initialize();
+        Tema.Inicializar();
+
+        // Npgsql timestamp behavior: permitir comportamiento legado (opcional)
+        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
+        // Leer configuración (appsettings.json)
+        var config = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .Build();
+
+        string conn = config.GetConnectionString("DefaultConnection")
+            ?? config["ConnectionStrings:DefaultConnection"]
+            ?? "Host=pg-1cd82588-victorguillermo298-b5b6.j.aivencloud.com;Port=20508;Database=defaultdb;Username=avnadmin;Password=AVNS_34n8lozvFOC4EWW8ExK;Ssl Mode=Require;";
+
+        // Guardar en configuración global para que los repositorios EF puedan usarla
+        InfoLibroProgramConfiguration.ConnectionString = conn;
+
+        // NOTA: la capa ADO.NET anterior (SqlConnection) NO es compatible con PostgreSQL.
+        // Conexion.CadenaConexion ya no se asigna automáticamente al URI de PostgreSQL.
+
+        // Configurar DbContext (PostgreSQL) y ejecutar seeder
+        var options = new DbContextOptionsBuilder<InfoLibroDbContext>()
+            .UseNpgsql(conn)
+            .Options;
+
+        try
+        {
+            using (var context = new InfoLibroDbContext(options))
+            {
+                // Crear la base de datos si no existe y aplicar el esquema mínimo
+                context.Database.EnsureCreated();
+
+                // Seeder: crear roles si no existen
+                if (!context.Roles.Any())
+                {
+                    var rolAdmin = new Rol
+                    {
+                        NombreRol = "Administrador",
+                        PuedeAdministrar = true,
+                        PuedeAgregar = true,
+                        PuedeConsultar = true,
+                        PuedeModificar = true,
+                        PuedeEliminar = true
+                    };
+                    var rolUser = new Rol
+                    {
+                        NombreRol = "Usuario",
+                        PuedeAdministrar = false,
+                        PuedeAgregar = true,
+                        PuedeConsultar = true,
+                        PuedeModificar = false,
+                        PuedeEliminar = false
+                    };
+
+                    context.Roles.AddRange(rolAdmin, rolUser);
+                    // Guardar primero los roles para que PostgreSQL asigne los IDs en las secuencias
+                    context.SaveChanges();
+                }
+
+                // Recuperar roles desde la base de datos para evitar conflictos de secuencia/IDs
+                var rolAdminDb = context.Roles.FirstOrDefault(r => r.NombreRol == "Administrador");
+                var rolUserDb = context.Roles.FirstOrDefault(r => r.NombreRol == "Usuario");
+
+                if (rolAdminDb == null || rolUserDb == null)
+                {
+                    throw new Exception("No se pudieron crear o recuperar los roles necesarios.");
+                }
+
+                // Seeder: crear usuarios si no existen
+                if (!context.Usuarios.Any())
+                {
+                    var salt1 = Hash.GenerarSalt();
+                    var hash1 = Hash.Calcular("Admin123", salt1);
+
+                    var admin = new Usuario
+                    {
+                        NombreUsuario = "admin",
+                        NombreCompleto = "Administrador",
+                        Correo = "admin@local",
+                        Salt = salt1,
+                        ClaveHash = hash1,
+                        IdRol = rolAdminDb.IdRol,
+                        Activo = true,
+                        FechaRegistro = DateTime.UtcNow
+                    };
+
+                    var salt2 = Hash.GenerarSalt();
+                    var hash2 = Hash.Calcular("User123!", salt2);
+
+                    var user = new Usuario
+                    {
+                        NombreUsuario = "user",
+                        NombreCompleto = "Usuario de prueba",
+                        Correo = "user@local",
+                        Salt = salt2,
+                        ClaveHash = hash2,
+                        IdRol = rolUserDb.IdRol,
+                        Activo = true,
+                        FechaRegistro = DateTime.Now
+                    };
+
+                    context.Usuarios.AddRange(admin, user);
+                    try
+                    {
+                        context.SaveChanges();
+                    }
+                    catch (DbUpdateException dbEx)
+                    {
+                        MessageBox.Show("Error al guardar usuarios en la base de datos: " + (dbEx.InnerException?.Message ?? dbEx.Message),
+                            "Error de inicialización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+        catch (DbUpdateException dbEx)
+        {
+            MessageBox.Show("Error al inicializar la base de datos (DbUpdateException): " + (dbEx.InnerException?.Message ?? dbEx.Message),
+                "Error de inicialización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Error al inicializar la base de datos: " + ex.Message,
+                "Error de inicialización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            // Continuamos para permitir que la app muestre el error de conexión original si aplica
+        }
+
+        // Probar conexión usando EF Core (Npgsql)
+        try
+        {
+            using var testCtx = new InfoLibroDbContext(options);
+            if (!testCtx.Database.CanConnect())
+            {
+                MessageBox.Show(
+                    "No se pudo conectar con la base de datos PostgreSQL (Aiven).\n\n" +
+                    "Revisa la cadena de conexión en appsettings.json y la accesibilidad de la instancia Aiven.",
+                    "Error de conexión", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("No se pudo conectar con la base de datos PostgreSQL: " + ex.Message,
+                "Error de conexión", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        // Flujo: Login -> Menú principal -> (Cerrar sesión vuelve al Login)
+        bool seguir = true;
+        while (seguir)
+        {
+            using (var login = new FrmLogin())
+            {
+                if (login.ShowDialog() != DialogResult.OK) break;   // Salir o cerrar ventana
+            }
+
+            using (var principal = new FrmPrincipal())
+            {
+                principal.ShowDialog();
+                seguir = principal.VolverAlLogin;
+            }
+
+            Sesion.Cerrar();
+        }
+    }
+}

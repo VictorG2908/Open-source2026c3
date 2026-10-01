@@ -1,49 +1,25 @@
-using System.Data;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using InfoLibro.Modelos;
 using InfoLibro.Seguridad;
-using Microsoft.Data.SqlClient;
 
 namespace InfoLibro.Datos;
 
-/// <summary>Acceso a la tabla Roles (ADO.NET con consultas parametrizadas).</summary>
+/// <summary>Acceso a la tabla Roles usando EF Core.</summary>
 public static class RolDatos
 {
-    const string Columnas = "IdRol, NombreRol, PuedeConsultar, PuedeAgregar, PuedeModificar, PuedeEliminar, PuedeAdministrar";
-
-    /// <summary>Convierte la fila actual del lector en un Rol (también sirve para consultas con JOIN).</summary>
-    public static Rol LeerRol(SqlDataReader rd)
-    {
-        return new Rol
-        {
-            IdRol = (int)rd["IdRol"],
-            NombreRol = (string)rd["NombreRol"],
-            PuedeConsultar = (bool)rd["PuedeConsultar"],
-            PuedeAgregar = (bool)rd["PuedeAgregar"],
-            PuedeModificar = (bool)rd["PuedeModificar"],
-            PuedeEliminar = (bool)rd["PuedeEliminar"],
-            PuedeAdministrar = (bool)rd["PuedeAdministrar"]
-        };
-    }
-
     public static List<Rol> ObtenerTodos()
     {
-        var lista = new List<Rol>();
-        using var cn = Conexion.Crear();
-        cn.Open();
-        using var cmd = new SqlCommand($"SELECT {Columnas} FROM Roles ORDER BY IdRol", cn);
-        using var rd = cmd.ExecuteReader();
-        while (rd.Read()) lista.Add(LeerRol(rd));
-        return lista;
+        using var db = CreateContext();
+        return db.Roles.OrderBy(r => r.IdRol).ToList();
     }
 
     public static Rol ObtenerPorId(int idRol)
     {
-        using var cn = Conexion.Crear();
-        cn.Open();
-        using var cmd = new SqlCommand($"SELECT {Columnas} FROM Roles WHERE IdRol = @id", cn);
-        cmd.Parameters.Add("@id", SqlDbType.Int).Value = idRol;
-        using var rd = cmd.ExecuteReader();
-        return rd.Read() ? LeerRol(rd) : null;
+        using var db = CreateContext();
+        return db.Roles.Find(idRol);
     }
 
     public static bool Crear(Rol rol, out string error)
@@ -58,29 +34,32 @@ public static class RolDatos
         }
         string nombre = rol.NombreRol.Trim();
 
-        try
-        {
-            using var cn = Conexion.Crear();
-            cn.Open();
-            using var cmd = new SqlCommand(@"
-                INSERT INTO Roles (NombreRol, PuedeConsultar, PuedeAgregar, PuedeModificar, PuedeEliminar, PuedeAdministrar)
-                VALUES (@nombre, @consultar, @agregar, @modificar, @eliminar, @administrar);
-                SELECT CAST(SCOPE_IDENTITY() AS INT);", cn);
-            cmd.Parameters.Add("@nombre", SqlDbType.NVarChar, 50).Value = nombre;
-            cmd.Parameters.Add("@consultar", SqlDbType.Bit).Value = rol.PuedeConsultar;
-            cmd.Parameters.Add("@agregar", SqlDbType.Bit).Value = rol.PuedeAgregar;
-            cmd.Parameters.Add("@modificar", SqlDbType.Bit).Value = rol.PuedeModificar;
-            cmd.Parameters.Add("@eliminar", SqlDbType.Bit).Value = rol.PuedeEliminar;
-            cmd.Parameters.Add("@administrar", SqlDbType.Bit).Value = rol.PuedeAdministrar;
-
-            rol.IdRol = (int)cmd.ExecuteScalar();
-            rol.NombreRol = nombre;
-            return true;
-        }
-        catch (SqlException ex) when (ex.Number == 2627 || ex.Number == 2601)   // nombre duplicado
+        using var db = CreateContext();
+        if (db.Roles.Any(r => r.NombreRol == nombre))
         {
             error = "Ya existe un rol con ese nombre.";
             return false;
         }
+
+        rol.NombreRol = nombre;
+        try
+        {
+            db.Roles.Add(rol);
+            db.SaveChanges();
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            error = ex.InnerException?.Message ?? ex.Message;
+            return false;
+        }
+    }
+
+    static InfoLibroDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<InfoLibroDbContext>()
+            .UseNpgsql(InfoLibroProgramConfiguration.GetConnectionString())
+            .Options;
+        return new InfoLibroDbContext(options);
     }
 }

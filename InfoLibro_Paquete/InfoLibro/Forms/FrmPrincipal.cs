@@ -124,13 +124,13 @@ public class FrmPrincipal : Form
 
         var encabezado = new PanelDoble { Dock = DockStyle.Top, Height = 90, BackColor = Color.White };
 
-        Label saludo = Tema.Etiqueta($"Hi, {Sesion.UsuarioActual.PrimerNombre}!", Tema.FuenteTitulo(30f), Tema.Naranja);
+        Label saludo = Tema.Etiqueta($"Hi, {Sesion.UsuarioActual?.PrimerNombre ?? ""}!", Tema.FuenteTitulo(30f), Tema.Naranja);
         saludo.SetBounds(32, 14, 700, 62);
         saludo.TextAlign = ContentAlignment.MiddleLeft;
 
         var rol = new BotonRedondo
         {
-            Text = Sesion.RolActual.NombreRol,
+            Text = Sesion.RolActual?.NombreRol ?? "Sin Rol",
             Size = new Size(180, 38),
             Top = 26,
             SoloLectura = true,

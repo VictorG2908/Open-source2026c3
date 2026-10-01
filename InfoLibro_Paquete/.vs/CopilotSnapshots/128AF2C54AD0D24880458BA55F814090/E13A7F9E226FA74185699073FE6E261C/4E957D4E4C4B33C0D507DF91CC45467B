@@ -1,0 +1,215 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+using InfoLibro.Modelos;
+using InfoLibro.Seguridad;
+
+namespace InfoLibro.Datos;
+
+public class ResultadoLogin
+{
+    public bool Exito { get; set; }
+    public Usuario Usuario { get; set; }
+    public string Mensaje { get; set; }
+    public int IntentosRestantes { get; set; }
+    public bool Bloqueado { get; set; }
+}
+
+public static class UsuarioDatos
+{
+    public const int MaxIntentos = 3;
+    public const int MinutosBloqueo = 5;
+
+    // El conteo de intentos fallidos vive en memoria (se reinicia al cerrar el programa).
+    static readonly Dictionary<string, int> intentos = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    static readonly Dictionary<string, DateTime> bloqueos = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+
+    static Usuario ObtenerPorNombre(string nombreUsuario)
+    {
+        using var db = CreateContext();
+        nombreUsuario = (nombreUsuario ?? "").Trim();
+        return db.Usuarios.Include(u => u.Rol)
+            .FirstOrDefault(u => EF.Functions.ILike(u.NombreUsuario, nombreUsuario));
+    }
+
+    public static ResultadoLogin ValidarCredenciales(string nombreUsuario, string clave)
+    {
+        nombreUsuario = (nombreUsuario ?? "").Trim();
+
+        // Obtener usuario desde la BD (ObtenerPorNombre usa ILike para PostgreSQL)
+        Usuario u = ObtenerPorNombre(nombreUsuario);
+
+        // ¿Está bloqueado por demasiados intentos?
+        bool isBlocked = bloqueos.TryGetValue(nombreUsuario, out DateTime hasta) && DateTime.Now < hasta;
+        int minutosRestantes = isBlocked ? (int)Math.Ceiling((hasta - DateTime.Now).TotalMinutes) : 0;
+
+        bool isActive = u != null && u.Activo;
+        bool hashMatch = false;
+        try
+        {
+            if (u != null)
+                hashMatch = string.Equals(Hash.Calcular(clave, u.Salt), u.ClaveHash, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            hashMatch = false;
+        }
+
+        if (isBlocked)
+        {
+            return new ResultadoLogin
+            {
+                Bloqueado = true,
+                Mensaje = $"Demasiados intentos fallidos. Intenta de nuevo en {minutosRestantes} minuto(s)."
+            };
+        }
+
+        bool correcto = isActive && hashMatch;
+
+        if (correcto)
+        {
+            intentos.Remove(nombreUsuario);
+            return new ResultadoLogin { Exito = true, Usuario = u };
+        }
+
+        // Intento fallido (mismo mensaje exista o no el usuario, por seguridad)
+        intentos.TryGetValue(nombreUsuario, out int n);
+        n++;
+        intentos[nombreUsuario] = n;
+
+        if (n >= MaxIntentos)
+        {
+            bloqueos[nombreUsuario] = DateTime.Now.AddMinutes(MinutosBloqueo);
+            return new ResultadoLogin
+            {
+                Bloqueado = true,
+                Mensaje = $"Has fallado {MaxIntentos} veces. El acceso se bloqueó por {MinutosBloqueo} minutos."
+            };
+        }
+
+        return new ResultadoLogin
+        {
+            Mensaje = "Usuario o contraseña incorrectos.",
+            IntentosRestantes = MaxIntentos - n
+        };
+    }
+
+    public static List<Usuario> ObtenerTodos()
+    {
+        using var db = CreateContext();
+        return db.Usuarios.Include(u => u.Rol).OrderBy(u => u.IdUsuario).ToList();
+    }
+
+    public static bool Crear(Usuario u, string clave, out string error)
+    {
+        error = null;
+
+        using var db = CreateContext();
+
+        // Si no hay usuarios en la BD (instalación inicial) permitimos crear el primero sin exigir permisos
+        bool requiereAdmin = db.Usuarios.Any();
+        if (requiereAdmin) Permisos.Exigir(Accion.Administrar, "crear usuarios");
+
+        // Validaciones previas
+        if (string.IsNullOrWhiteSpace(u.NombreUsuario))
+        {
+            error = "El nombre de usuario es obligatorio.";
+            return false;
+        }
+
+        if (db.Usuarios.Any(x => x.NombreUsuario.ToLower() == u.NombreUsuario.ToLower()))
+        {
+            error = "Ya existe un usuario con ese nombre.";
+            return false;
+        }
+
+        var rol = db.Roles.Find(u.IdRol);
+        if (rol == null)
+        {
+            error = "El rol seleccionado no existe.";
+            return false;
+        }
+
+        u.Salt = Hash.GenerarSalt();
+        u.ClaveHash = Hash.Calcular(clave, u.Salt);
+        u.Activo = u.Activo;
+        u.FechaRegistro = u.FechaRegistro == default ? DateTime.UtcNow : u.FechaRegistro;
+
+        try
+        {
+            db.Usuarios.Add(u);
+            db.SaveChanges();
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            error = ex.InnerException?.Message ?? ex.Message;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public static bool RestablecerClave(int idUsuario, string nuevaClave)
+    {
+        Permisos.Exigir(Accion.Administrar, "restablecer contraseñas");
+
+        using var db = CreateContext();
+        var u = db.Usuarios.Find(idUsuario);
+        if (u == null) return false;
+
+        u.Salt = Hash.GenerarSalt();
+        u.ClaveHash = Hash.Calcular(nuevaClave, u.Salt);
+        db.SaveChanges();
+
+        // También desbloquea al usuario si estaba bloqueado
+        bloqueos.Remove(u.NombreUsuario);
+        intentos.Remove(u.NombreUsuario);
+        return true;
+    }
+
+    public static bool Eliminar(int idUsuario, out string error)
+    {
+        Permisos.Exigir(Accion.Eliminar, "eliminar usuarios");
+        error = null;
+
+        if (Sesion.UsuarioActual != null && Sesion.UsuarioActual.IdUsuario == idUsuario)
+        {
+            error = "No puedes eliminar tu propia cuenta mientras tienes la sesión abierta.";
+            return false;
+        }
+
+        using var db = CreateContext();
+        var u = db.Usuarios.Find(idUsuario);
+        if (u == null)
+        {
+            error = "El usuario no existe.";
+            return false;
+        }
+
+        try
+        {
+            db.Usuarios.Remove(u);
+            db.SaveChanges();
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            // Probablemente restricciones FK (préstamos/reservas)
+            error = "No se puede eliminar: este usuario tiene préstamos o reservas registrados.";
+            return false;
+        }
+    }
+
+    static InfoLibroDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<InfoLibroDbContext>()
+            .UseNpgsql(InfoLibroProgramConfiguration.GetConnectionString())
+            .Options;
+        return new InfoLibroDbContext(options);
+    }
+}
