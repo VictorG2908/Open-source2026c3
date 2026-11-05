@@ -38,6 +38,7 @@ public class FrmPrincipal : Form
 
         // Módulos de la aplicación (Préstamos y Reservas se construyen en etapas siguientes)
         modulos.Add(new Modulo { Texto = "Inicio", Icono = "icono_inicio.png", Requiere = Accion.Consultar, Crear = () => new FrmInicio() });
+        modulos.Add(new Modulo { Texto = "Clientes", Icono = "icono_inicio.png", Requiere = Accion.Consultar, Crear = () => new FrmClientes() });
         modulos.Add(new Modulo { Texto = "Préstamos", Icono = "icono_prestamos.png", Requiere = Accion.Consultar, Crear = () => new FrmProximamente("Préstamos") });
         modulos.Add(new Modulo { Texto = "Reservas", Icono = "icono_reservas.png", Requiere = Accion.Consultar, Crear = () => new FrmProximamente("Reservas") });
         modulos.Add(new Modulo { Texto = "Perfil", Icono = "icono_perfil.png", Requiere = Accion.Consultar, Crear = () => new FrmPerfil() });

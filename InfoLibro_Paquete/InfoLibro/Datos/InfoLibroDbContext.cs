@@ -9,6 +9,7 @@ public class InfoLibroDbContext : DbContext
 
     public DbSet<Usuario> Usuarios { get; set; }
     public DbSet<Rol> Roles { get; set; }
+    public DbSet<Cliente> Clientes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +31,17 @@ public class InfoLibroDbContext : DbContext
             b.Property(x => x.Salt).HasMaxLength(50);
 
             b.HasOne<Rol>().WithMany().HasForeignKey(u => u.IdRol);
+        });
+
+        modelBuilder.Entity<Cliente>(b =>
+        {
+            b.HasKey(x => x.IdCliente);
+            b.Property(x => x.Nombre).HasMaxLength(80).IsRequired();
+            b.Property(x => x.Apellido).HasMaxLength(80).IsRequired();
+            b.Property(x => x.Telefono).HasMaxLength(30).IsRequired();
+            b.Property(x => x.Correo).HasMaxLength(120).IsRequired();
+            b.Property(x => x.Direccion).HasMaxLength(200).IsRequired();
+            b.HasIndex(x => x.Correo).IsUnique();
         });
     }
 }

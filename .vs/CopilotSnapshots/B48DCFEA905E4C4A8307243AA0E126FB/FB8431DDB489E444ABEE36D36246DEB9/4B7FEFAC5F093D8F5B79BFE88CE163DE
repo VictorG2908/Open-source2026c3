@@ -1,0 +1,257 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+using InfoLibro.Datos;
+using InfoLibro.Modelos;
+using InfoLibro.Seguridad;
+using InfoLibro.Utilidades;
+
+namespace InfoLibro.Forms;
+
+public class FrmClientes : Form
+{
+    readonly DataGridView grid = new DataGridView();
+    readonly CampoRedondo txtIdBusqueda = new CampoRedondo { Placeholder = "Buscar por ID", Height = 40, ColorBorde = Tema.Naranja };
+    readonly CampoRedondo txtNombreBusqueda = new CampoRedondo { Placeholder = "Buscar por nombre o apellido", Height = 40, ColorBorde = Tema.Naranja };
+    readonly CampoRedondo txtNombre = new CampoRedondo { Placeholder = "Nombre", Height = 40, ColorBorde = Tema.Naranja };
+    readonly CampoRedondo txtApellido = new CampoRedondo { Placeholder = "Apellido", Height = 40, ColorBorde = Tema.Naranja };
+    readonly CampoRedondo txtTelefono = new CampoRedondo { Placeholder = "Teléfono", Height = 40, ColorBorde = Tema.Naranja };
+    readonly CampoRedondo txtCorreo = new CampoRedondo { Placeholder = "correo@ejemplo.com", Height = 40, ColorBorde = Tema.Naranja };
+    readonly CampoRedondo txtDireccion = new CampoRedondo { Placeholder = "Dirección", Height = 40, ColorBorde = Tema.Naranja };
+    readonly List<Cliente> clientes = new List<Cliente>();
+
+    public FrmClientes()
+    {
+        BackColor = Color.White;
+        Text = "Clientes";
+
+        foreach (CampoRedondo campo in new[] { txtNombre, txtApellido, txtTelefono, txtCorreo, txtDireccion })
+            campo.Caja.MaxLength = campo == txtDireccion ? 200 : campo == txtCorreo ? 120 : 80;
+        txtTelefono.Caja.MaxLength = 30;
+        txtIdBusqueda.Caja.MaxLength = 12;
+        txtNombreBusqueda.Caja.MaxLength = 160;
+
+        var pnlTitulo = new Panel { Dock = DockStyle.Top, Height = 76 };
+        Label titulo = Tema.Etiqueta("Clientes", Tema.FuenteTexto(22f, FontStyle.Bold), Tema.ColorTexto);
+        titulo.SetBounds(40, 10, 600, 42);
+        Label sub = Tema.Etiqueta("Administra los datos de los clientes registrados.", Tema.FuenteTexto(10.5f), Tema.ColorTextoSuave);
+        sub.SetBounds(40, 48, 700, 22);
+        pnlTitulo.Controls.Add(titulo);
+        pnlTitulo.Controls.Add(sub);
+
+        var pnlBusqueda = new Panel { Dock = DockStyle.Top, Height = 58, Padding = new Padding(40, 4, 16, 8) };
+        txtIdBusqueda.SetBounds(40, 4, 180, 40);
+        txtNombreBusqueda.SetBounds(236, 4, 300, 40);
+        pnlBusqueda.Controls.Add(txtIdBusqueda);
+        pnlBusqueda.Controls.Add(txtNombreBusqueda);
+
+        Tema.EstiloTabla(grid);
+        grid.Dock = DockStyle.Fill;
+        grid.Columns.Add("id", "ID");
+        grid.Columns.Add("nombre", "Nombre");
+        grid.Columns.Add("apellido", "Apellido");
+        grid.Columns.Add("telefono", "Teléfono");
+        grid.Columns.Add("correo", "Correo");
+        grid.Columns.Add("direccion", "Dirección");
+        grid.Columns["id"].Visible = false;
+
+        var pnlTabla = new Panel { Dock = DockStyle.Fill, Padding = new Padding(40, 0, 16, 24) };
+        pnlTabla.Controls.Add(grid);
+
+        var derecha = new Panel { Dock = DockStyle.Right, Width = 370, AutoScroll = true };
+        int y = 10;
+        void Fila(string etiqueta, Control campo)
+        {
+            Label l = Tema.Etiqueta(etiqueta, Tema.FuenteTexto(10f, FontStyle.Bold), Tema.ColorTextoSuave);
+            l.SetBounds(24, y, 320, 20);
+            campo.SetBounds(24, y + 22, 320, campo.Height);
+            derecha.Controls.Add(l);
+            derecha.Controls.Add(campo);
+            y += 68;
+        }
+
+        Fila("Nombre", txtNombre);
+        Fila("Apellido", txtApellido);
+        Fila("Teléfono", txtTelefono);
+        Fila("Correo", txtCorreo);
+        Fila("Dirección", txtDireccion);
+
+        var btnAgregar = new BotonRedondo { Text = "Agregar", Bounds = new Rectangle(24, y + 4, 154, 42) };
+        var btnModificar = new BotonRedondo { Text = "Modificar", Bounds = new Rectangle(190, y + 4, 154, 42) };
+        var btnEliminar = new BotonRedondo
+        {
+            Text = "Eliminar",
+            Bounds = new Rectangle(24, y + 54, 154, 42),
+            ColorNormal = Tema.Rojo,
+            ColorHover = Color.FromArgb(200, 40, 36)
+        };
+        var btnConsultar = new BotonRedondo
+        {
+            Text = "Consultar",
+            Bounds = new Rectangle(190, y + 54, 154, 42),
+            ColorNormal = Color.White,
+            ColorHover = Tema.NaranjaClaro,
+            ColorLetra = Tema.NaranjaOscuro,
+            ColorBorde = Tema.Naranja
+        };
+        var btnLimpiar = new BotonRedondo
+        {
+            Text = "Limpiar campos",
+            Bounds = new Rectangle(24, y + 104, 320, 42),
+            ColorNormal = Color.White,
+            ColorHover = Tema.NaranjaClaro,
+            ColorLetra = Tema.NaranjaOscuro,
+            ColorBorde = Tema.Naranja
+        };
+        derecha.Controls.Add(btnAgregar);
+        derecha.Controls.Add(btnModificar);
+        derecha.Controls.Add(btnEliminar);
+        derecha.Controls.Add(btnConsultar);
+        derecha.Controls.Add(btnLimpiar);
+
+        Controls.Add(pnlTabla);
+        Controls.Add(derecha);
+        Controls.Add(pnlBusqueda);
+        Controls.Add(pnlTitulo);
+
+        txtIdBusqueda.Caja.TextChanged += (s, e) => AplicarFiltro();
+        txtNombreBusqueda.Caja.TextChanged += (s, e) => AplicarFiltro();
+        grid.SelectionChanged += (s, e) => CargarSeleccionado();
+        btnAgregar.Click += (s, e) => Agregar();
+        btnModificar.Click += (s, e) => Modificar();
+        btnEliminar.Click += (s, e) => Eliminar();
+        btnConsultar.Click += (s, e) => CargarClientes();
+        btnLimpiar.Click += (s, e) => LimpiarCampos();
+
+        CargarClientes();
+    }
+
+    void CargarClientes()
+    {
+        try
+        {
+            clientes.Clear();
+            clientes.AddRange(ClienteDatos.ObtenerTodos());
+            AplicarFiltro();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("No se pudieron consultar los clientes.\n\nDetalle: " + ex.Message,
+                "Error de base de datos", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    void AplicarFiltro()
+    {
+        string id = txtIdBusqueda.Valor.Trim();
+        string nombre = txtNombreBusqueda.Valor.Trim();
+        IEnumerable<Cliente> filtrados = clientes;
+
+        if (!string.IsNullOrWhiteSpace(id))
+            filtrados = filtrados.Where(c => c.IdCliente.ToString().Contains(id, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(nombre))
+            filtrados = filtrados.Where(c => ($"{c.Nombre} {c.Apellido}").Contains(nombre, StringComparison.OrdinalIgnoreCase));
+
+        grid.Rows.Clear();
+        foreach (Cliente c in filtrados)
+            grid.Rows.Add(c.IdCliente, c.Nombre, c.Apellido, c.Telefono, c.Correo, c.Direccion);
+    }
+
+    int? IdSeleccionado()
+    {
+        if (grid.CurrentRow == null || grid.CurrentRow.Cells["id"].Value == null) return null;
+        return Convert.ToInt32(grid.CurrentRow.Cells["id"].Value);
+    }
+
+    void CargarSeleccionado()
+    {
+        int? id = IdSeleccionado();
+        if (!id.HasValue) return;
+        Cliente cliente = clientes.FirstOrDefault(c => c.IdCliente == id.Value);
+        if (cliente == null) return;
+        txtNombre.Valor = cliente.Nombre;
+        txtApellido.Valor = cliente.Apellido;
+        txtTelefono.Valor = cliente.Telefono;
+        txtCorreo.Valor = cliente.Correo;
+        txtDireccion.Valor = cliente.Direccion;
+    }
+
+    Cliente LeerFormulario()
+    {
+        return new Cliente
+        {
+            Nombre = txtNombre.Valor,
+            Apellido = txtApellido.Valor,
+            Telefono = txtTelefono.Valor,
+            Correo = txtCorreo.Valor,
+            Direccion = txtDireccion.Valor
+        };
+    }
+
+    void Agregar()
+    {
+        if (!Permisos.Verificar(Accion.Agregar, "agregar clientes")) return;
+        Cliente cliente = LeerFormulario();
+        if (!ClienteDatos.Crear(cliente, out string error))
+        {
+            MessageBox.Show(error, "No se pudo agregar el cliente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        CargarClientes();
+        LimpiarCampos();
+        MessageBox.Show("Cliente agregado correctamente.", "Listo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    void Modificar()
+    {
+        if (!Permisos.Verificar(Accion.Modificar, "modificar clientes")) return;
+        int? id = IdSeleccionado();
+        if (!id.HasValue)
+        {
+            MessageBox.Show("Selecciona un cliente de la tabla.", "Cliente no seleccionado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        Cliente cliente = LeerFormulario();
+        cliente.IdCliente = id.Value;
+        if (!ClienteDatos.Modificar(cliente, out string error))
+        {
+            MessageBox.Show(error, "No se pudo modificar el cliente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        CargarClientes();
+        MessageBox.Show("Cliente modificado correctamente.", "Listo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    void Eliminar()
+    {
+        if (!Permisos.Verificar(Accion.Eliminar, "eliminar clientes")) return;
+        int? id = IdSeleccionado();
+        if (!id.HasValue)
+        {
+            MessageBox.Show("Selecciona un cliente de la tabla.", "Cliente no seleccionado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        if (MessageBox.Show("¿Seguro que deseas eliminar el cliente seleccionado?", "Confirmar eliminación",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (!ClienteDatos.Eliminar(id.Value, out string error))
+        {
+            MessageBox.Show(error, "No se pudo eliminar el cliente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        CargarClientes();
+        LimpiarCampos();
+        MessageBox.Show("Cliente eliminado correctamente.", "Listo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    void LimpiarCampos()
+    {
+        txtNombre.Valor = "";
+        txtApellido.Valor = "";
+        txtTelefono.Valor = "";
+        txtCorreo.Valor = "";
+        txtDireccion.Valor = "";
+        grid.ClearSelection();
+    }
+}
