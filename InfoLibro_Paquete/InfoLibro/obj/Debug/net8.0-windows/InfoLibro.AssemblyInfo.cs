@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("InfoLibro")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c6110ef72538b1170c0c9c4af545645a0695cba6")]
 [assembly: System.Reflection.AssemblyProductAttribute("InfoLibro")]
 [assembly: System.Reflection.AssemblyTitleAttribute("InfoLibro")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

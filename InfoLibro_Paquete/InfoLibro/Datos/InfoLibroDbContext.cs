@@ -23,12 +23,14 @@ public class InfoLibroDbContext : DbContext
         modelBuilder.Entity<Usuario>(b =>
         {
             b.HasKey(x => x.IdUsuario);
-            b.Property(x => x.NombreUsuario).HasMaxLength(30);
-            b.Property(x => x.NombreCompleto).HasMaxLength(100);
-            b.Property(x => x.Correo).HasMaxLength(120);
-            b.Property(x => x.ClaveHash).HasMaxLength(64);
-            b.Property(x => x.Salt).HasMaxLength(50);
+            b.Property(x => x.NombreUsuario).HasMaxLength(30).IsRequired();
+            b.Property(x => x.NombreCompleto).HasMaxLength(100).IsRequired();
+            b.Property(x => x.Correo).HasMaxLength(120).IsRequired();
+            b.Property(x => x.ClaveHash).HasMaxLength(64).IsRequired();
+            b.Property(x => x.Salt).HasMaxLength(50).IsRequired();
 
+            b.HasIndex(x => x.NombreUsuario).IsUnique();
+            b.HasIndex(x => x.Correo).IsUnique();
             b.HasOne<Rol>().WithMany().HasForeignKey(u => u.IdRol);
         });
     }

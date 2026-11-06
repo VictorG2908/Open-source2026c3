@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using InfoLibro.Modelos;
 using InfoLibro.Seguridad;
+using InfoLibro.Utilidades;
 
 namespace InfoLibro.Datos;
 
@@ -21,26 +22,84 @@ public static class UsuarioDatos
     public const int MaxIntentos = 3;
     public const int MinutosBloqueo = 5;
 
-    // El conteo de intentos fallidos vive en memoria (se reinicia al cerrar el programa).
-    static readonly Dictionary<string, int> intentos = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-    static readonly Dictionary<string, DateTime> bloqueos = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+    static readonly Dictionary<string, int> intentos = new(StringComparer.OrdinalIgnoreCase);
+    static readonly Dictionary<string, DateTime> bloqueos = new(StringComparer.OrdinalIgnoreCase);
 
     static Usuario ObtenerPorNombre(string nombreUsuario)
     {
         using var db = CreateContext();
-        nombreUsuario = (nombreUsuario ?? "").Trim();
+        nombreUsuario = (nombreUsuario ?? string.Empty).Trim();
         return db.Usuarios.Include(u => u.Rol)
             .FirstOrDefault(u => EF.Functions.ILike(u.NombreUsuario, nombreUsuario));
     }
 
+    public static Usuario ObtenerPorId(int idUsuario)
+    {
+        using var db = CreateContext();
+        return db.Usuarios.Include(u => u.Rol)
+            .FirstOrDefault(u => u.IdUsuario == idUsuario);
+    }
+
+    static string NormalizarTexto(string valor) => valor == null ? string.Empty : valor.Trim();
+
+    static bool ValidarEntidad(Usuario u, string clave, bool requiereClave, out string error)
+    {
+        error = null;
+
+        if (u == null)
+        {
+            error = "El usuario no es válido.";
+            return false;
+        }
+
+        u.NombreUsuario = NormalizarTexto(u.NombreUsuario);
+        u.NombreCompleto = NormalizarTexto(u.NombreCompleto);
+        u.Correo = NormalizarTexto(u.Correo);
+
+        if (string.IsNullOrWhiteSpace(u.NombreUsuario))
+        {
+            error = "El nombre de usuario es obligatorio.";
+            return false;
+        }
+
+        if (!Validador.UsuarioValido(u.NombreUsuario))
+        {
+            error = "El usuario debe tener entre 4 y 20 caracteres y solo puede contener letras, números, punto o guion bajo.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(u.NombreCompleto))
+        {
+            error = "El nombre completo es obligatorio.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(u.Correo) || !Validador.CorreoValido(u.Correo))
+        {
+            error = "El correo no es válido.";
+            return false;
+        }
+
+        if (u.IdRol <= 0)
+        {
+            error = "Debe seleccionar un rol válido.";
+            return false;
+        }
+
+        if (requiereClave && !Validador.ClaveValida(clave))
+        {
+            error = "La contraseña debe tener al menos 6 caracteres.";
+            return false;
+        }
+
+        return true;
+    }
+
     public static ResultadoLogin ValidarCredenciales(string nombreUsuario, string clave)
     {
-        nombreUsuario = (nombreUsuario ?? "").Trim();
-
-        // Obtener usuario desde la BD (ObtenerPorNombre usa ILike para PostgreSQL)
+        nombreUsuario = (nombreUsuario ?? string.Empty).Trim();
         Usuario u = ObtenerPorNombre(nombreUsuario);
 
-        // ¿Está bloqueado por demasiados intentos?
         bool isBlocked = bloqueos.TryGetValue(nombreUsuario, out DateTime hasta) && DateTime.Now < hasta;
         int minutosRestantes = isBlocked ? (int)Math.Ceiling((hasta - DateTime.Now).TotalMinutes) : 0;
 
@@ -66,14 +125,12 @@ public static class UsuarioDatos
         }
 
         bool correcto = isActive && hashMatch;
-
         if (correcto)
         {
             intentos.Remove(nombreUsuario);
             return new ResultadoLogin { Exito = true, Usuario = u };
         }
 
-        // Intento fallido (mismo mensaje exista o no el usuario, por seguridad)
         intentos.TryGetValue(nombreUsuario, out int n);
         n++;
         intentos[nombreUsuario] = n;
@@ -98,7 +155,10 @@ public static class UsuarioDatos
     public static List<Usuario> ObtenerTodos()
     {
         using var db = CreateContext();
-        return db.Usuarios.Include(u => u.Rol).OrderBy(u => u.IdUsuario).ToList();
+        return db.Usuarios
+            .Include(u => u.Rol)
+            .OrderBy(u => u.IdUsuario)
+            .ToList();
     }
 
     public static bool Crear(Usuario u, string clave, out string error)
@@ -107,20 +167,22 @@ public static class UsuarioDatos
 
         using var db = CreateContext();
 
-        // Si no hay usuarios en la BD (instalación inicial) permitimos crear el primero sin exigir permisos
         bool requiereAdmin = db.Usuarios.Any();
-        if (requiereAdmin) Permisos.Exigir(Accion.Administrar, "crear usuarios");
+        if (requiereAdmin)
+            Permisos.Exigir(Accion.Administrar, "crear usuarios");
 
-        // Validaciones previas
-        if (string.IsNullOrWhiteSpace(u.NombreUsuario))
+        if (!ValidarEntidad(u, clave, true, out error))
+            return false;
+
+        if (db.Usuarios.Any(x => EF.Functions.ILike(x.NombreUsuario, u.NombreUsuario)))
         {
-            error = "El nombre de usuario es obligatorio.";
+            error = "Ya existe un usuario con ese nombre.";
             return false;
         }
 
-        if (db.Usuarios.Any(x => x.NombreUsuario.ToLower() == u.NombreUsuario.ToLower()))
+        if (db.Usuarios.Any(x => EF.Functions.ILike(x.Correo, u.Correo)))
         {
-            error = "Ya existe un usuario con ese nombre.";
+            error = "Ya existe un usuario con ese correo.";
             return false;
         }
 
@@ -133,7 +195,7 @@ public static class UsuarioDatos
 
         u.Salt = Hash.GenerarSalt();
         u.ClaveHash = Hash.Calcular(clave, u.Salt);
-        u.Activo = u.Activo;
+        u.Activo = true;
         u.FechaRegistro = u.FechaRegistro == default ? DateTime.UtcNow : u.FechaRegistro;
 
         try
@@ -154,19 +216,130 @@ public static class UsuarioDatos
         }
     }
 
+    public static bool Actualizar(int idUsuario, Usuario usuario, out string error)
+    {
+        error = null;
+        Permisos.Exigir(Accion.Administrar, "actualizar usuarios");
+
+        if (usuario == null)
+        {
+            error = "El usuario a actualizar no es válido.";
+            return false;
+        }
+
+        if (!ValidarEntidad(usuario, null, false, out error))
+            return false;
+
+        using var db = CreateContext();
+        var entidad = db.Usuarios.FirstOrDefault(u => u.IdUsuario == idUsuario);
+        if (entidad == null)
+        {
+            error = "El usuario no existe.";
+            return false;
+        }
+
+        if (db.Usuarios.Any(u => u.IdUsuario != idUsuario && EF.Functions.ILike(u.NombreUsuario, usuario.NombreUsuario)))
+        {
+            error = "Ya existe otro usuario con ese nombre.";
+            return false;
+        }
+
+        if (db.Usuarios.Any(u => u.IdUsuario != idUsuario && EF.Functions.ILike(u.Correo, usuario.Correo)))
+        {
+            error = "Ya existe otro usuario con ese correo.";
+            return false;
+        }
+
+        var rol = db.Roles.Find(usuario.IdRol);
+        if (rol == null)
+        {
+            error = "El rol seleccionado no existe.";
+            return false;
+        }
+
+        entidad.NombreUsuario = usuario.NombreUsuario;
+        entidad.NombreCompleto = usuario.NombreCompleto;
+        entidad.Correo = usuario.Correo;
+        entidad.IdRol = usuario.IdRol;
+        entidad.Activo = usuario.Activo;
+
+        try
+        {
+            db.SaveChanges();
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            error = ex.InnerException?.Message ?? ex.Message;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public static bool CambiarEstado(int idUsuario, bool activo, out string error)
+    {
+        error = null;
+        Permisos.Exigir(Accion.Administrar, "activar o desactivar usuarios");
+
+        using var db = CreateContext();
+        var entidad = db.Usuarios.FirstOrDefault(u => u.IdUsuario == idUsuario);
+        if (entidad == null)
+        {
+            error = "El usuario no existe.";
+            return false;
+        }
+
+        if (Sesion.UsuarioActual != null && Sesion.UsuarioActual.IdUsuario == idUsuario && !activo)
+        {
+            error = "No puedes desactivar tu propia cuenta mientras tengas la sesión abierta.";
+            return false;
+        }
+
+        entidad.Activo = activo;
+        if (activo && entidad.FechaRegistro == default)
+            entidad.FechaRegistro = DateTime.UtcNow;
+
+        try
+        {
+            db.SaveChanges();
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            error = ex.InnerException?.Message ?? ex.Message;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public static bool Activar(int idUsuario, out string error) => CambiarEstado(idUsuario, true, out error);
+
+    public static bool Desactivar(int idUsuario, out string error) => CambiarEstado(idUsuario, false, out error);
+
     public static bool RestablecerClave(int idUsuario, string nuevaClave)
     {
+        if (string.IsNullOrWhiteSpace(nuevaClave) || !Validador.ClaveValida(nuevaClave))
+            throw new ArgumentException("La nueva contraseña debe tener al menos 6 caracteres.");
+
         Permisos.Exigir(Accion.Administrar, "restablecer contraseñas");
 
         using var db = CreateContext();
         var u = db.Usuarios.Find(idUsuario);
-        if (u == null) return false;
+        if (u == null)
+            return false;
 
         u.Salt = Hash.GenerarSalt();
         u.ClaveHash = Hash.Calcular(nuevaClave, u.Salt);
         db.SaveChanges();
 
-        // También desbloquea al usuario si estaba bloqueado
         bloqueos.Remove(u.NombreUsuario);
         intentos.Remove(u.NombreUsuario);
         return true;
@@ -197,9 +370,8 @@ public static class UsuarioDatos
             db.SaveChanges();
             return true;
         }
-        catch (DbUpdateException ex)
+        catch (DbUpdateException)
         {
-            // Probablemente restricciones FK (préstamos/reservas)
             error = "No se puede eliminar: este usuario tiene préstamos o reservas registrados.";
             return false;
         }
